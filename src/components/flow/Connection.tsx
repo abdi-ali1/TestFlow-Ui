@@ -15,7 +15,7 @@ const Connection: React.FC<ConnectionProps> = ({
   endY,
   isDragging = false
 }) => {
-  // Curving via bezier
+
   const curveOffset = Math.min(100, Math.abs(endX - startX) / 2);
 
   const path = `M ${startX},${startY}

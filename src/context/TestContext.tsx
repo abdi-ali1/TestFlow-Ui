@@ -1,11 +1,15 @@
 import React, { createContext, useContext, useState } from 'react';
+import { executeTest } from '../lib/testExecutor';
+import { buildResultFromExecution } from '../lib/resultBuilder';
+import {nodeTemplates } from "../components/flow/nodeTemplates"
 
 interface Node {
   id: string;
   type: string;
   label: string;
   position: { x: number; y: number };
-  config?: Record<string, any>;
+  config?: Record<string, string>;
+  args?: string[]; // Added to allow args property in Node
 }
 
 interface Connection {
@@ -22,7 +26,7 @@ interface TestFlow {
   lastModified: string;
 }
 
-interface TestResult {
+ export interface TestResult {
   id: string;
   testName: string;
   status: 'Passed' | 'Failed' | 'Skipped';
@@ -48,6 +52,8 @@ interface TestContextType {
   exportScript: () => void;
   dragNode: (type: string, label: string) => void;
   removeNode: (nodeId: string) => void;
+  updateNodeConfig: (nodeId: string, key: string, value: string) => void;
+  updateNodeArgs: (nodeId: string, newArgs: string[]) => void;
 }
 
 const TestContext = createContext<TestContextType | undefined>(undefined);
@@ -147,6 +153,35 @@ export const TestProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   ]);
 
+  const updateNodeConfig = (nodeId: string, key: string, value: string) => {
+  setNodes(prevNodes =>
+    prevNodes.map(node =>
+      node.id === nodeId
+        ? {
+            ...node,
+            config: {
+              ...node.config,
+              [key]: value
+            }
+          }
+        : node
+    )
+  );
+};
+
+const updateNodeArgs = (nodeId: string, newArgs: string[]) => {
+  setNodes(prevNodes =>
+    prevNodes.map(node =>
+      node.id === nodeId
+        ? {
+            ...node,
+            args: newArgs
+          }
+        : node
+    )
+  );
+};
+
   const [testResults, setTestResults] = useState<TestResult[]>([
     {
       id: 'result-1',
@@ -192,14 +227,20 @@ export const TestProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ]);
 
   const addNode = (position: { x: number; y: number, type: string, label: string }) => {
-    const newNode: Node = {
-      id: crypto.randomUUID(), // ✅ unieke id
-      type: position.type,
-      label: position.label,
-      position: { x: position.x, y: position.y },
-      config: {}
-    };
-    
+
+      const template = nodeTemplates.find(
+          (t) => t.type === position.type && t.label === position.label
+        );
+     const newNode: Node = {
+        id: crypto.randomUUID(),
+        type: position.type,
+        label: position.label,
+        position: { x: position.x, y: position.y },
+        config: template?.defaultConfig || {},  // ⬅️ hier pak je de hardcoded config
+        args: template?.defaultArgs || []       // ⬅️ als je met args werkt
+      };
+
+
     setNodes([...nodes, newNode]);
   };
 
@@ -244,33 +285,56 @@ export const TestProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTestFlows([newFlow, ...testFlows]);
   };
 
-  const runTest = () => {
-    alert('Test execution started!');
-    
-    // In a real app, this would trigger a real test execution
-    setTimeout(() => {
-      alert('Test execution completed!');
-      
-      const newResult: TestResult = {
-        id: `result-${testResults.length + 1}`,
-        testName: 'New Test Flow',
-        status: Math.random() > 0.2 ? 'Passed' : 'Failed',
-        date: new Date().toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: 'numeric' 
-        }),
-        duration: `${(Math.random() * 2 + 0.5).toFixed(2)}s`,
-        steps: nodes.map(node => ({
-          name: node.label,
-          status: Math.random() > 0.1 ? 'Passed' : 'Failed',
-          duration: `${(Math.random() * 0.5 + 0.1).toFixed(1)}s`
-        }))
-      };
-      
-      setTestResults([newResult, ...testResults]);
-    }, 1500);
+
+
+const runTest = async () => {
+  const contextEntries: Record<string, string> = {};
+  const steps: { keyword: string; args: string[] }[] = [];
+
+  for (const node of nodes) {
+    if (node.type === 'context') {
+      const key = node.config?.key;
+      const value = node.config?.value;
+      if (key && value) {
+        contextEntries[key] = value;
+      }
+      continue; // skip context nodes for steps
+    }
+
+    steps.push({
+      keyword: node.label,
+      args: Object.values(node.config || {})
+    });
+  }
+
+  const requestPayload = {
+    json_config: {
+      name: 'Contract Creation',
+      steps,
+      context: Object.keys(contextEntries).length > 0 ? contextEntries : undefined
+    }
   };
+
+  console.log('🚀 Verstuurde payload naar backend:', JSON.stringify(requestPayload, null, 2));
+
+  try {
+    const response = await executeTest(requestPayload);
+console.log('🧪 Volledige response van backend:', response);
+
+if (!response.result) {
+  alert(response.message || 'Test is succesvol ingepland.');
+  return;
+}
+
+const result = buildResultFromExecution(requestPayload, response, testResults.length);
+setTestResults(prev => [result, ...prev]);
+alert('✅ Test succesvol uitgevoerd');
+  } catch (err) {
+    console.error('❌ Fout bij uitvoeren test:', err);
+    alert('❌ Test mislukt');
+  }
+};
+
 
   const exportScript = () => {
     alert('Test script exported!');
@@ -305,7 +369,9 @@ export const TestProvider: React.FC<{ children: React.ReactNode }> = ({ children
       runTest,
       exportScript,
       dragNode,
-      removeNode
+      removeNode,
+      updateNodeConfig,
+      updateNodeArgs
     }}>
       {children}
     </TestContext.Provider>

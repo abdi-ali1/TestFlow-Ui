@@ -7,6 +7,7 @@ const NodePanel: React.FC = () => {
   const { dragNode } = useTestContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    Context: true,
     Triggers: true,
     Actions: true,
     Assertions: true,
@@ -29,6 +30,7 @@ const NodePanel: React.FC = () => {
   );
 
   const groupedTemplates = {
+    Context: filteredTemplates.filter(t => t.type === 'context'),
     Triggers: filteredTemplates.filter(t => t.type === 'trigger'),
     Actions: filteredTemplates.filter(t => t.type === 'action'),
     Assertions: filteredTemplates.filter(t => t.type === 'assertion'),

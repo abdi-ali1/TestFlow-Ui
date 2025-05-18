@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTestContext } from '../../context/TestContext';
 import Node from './Node';
 import Connection from './Connection';
@@ -86,14 +86,12 @@ const NodeCanvas: React.FC<NodeCanvasProps> = ({ pendingNode, onNodeAdded }) => 
   };
 
 
-  const handleConnectionStart = (nodeId: string, position: { x: number; y: number }) => {
+  const handleConnectionStart = (nodeId: string) => {
     const connectorRadius = 12;
     const nodeWidth = 240;
   
     const node = nodes.find(n => n.id === nodeId);
     if (!node || !canvasRef.current) return;
-  
-    const rect = canvasRef.current.getBoundingClientRect();
   
     const x = node.position.x + nodeWidth + connectorRadius;
     const y = node.position.y + 40;
@@ -169,6 +167,7 @@ const NodeCanvas: React.FC<NodeCanvasProps> = ({ pendingNode, onNodeAdded }) => 
       onMouseUp={handleMouseUp}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
+      onClick={handleCanvasClick}
   
     >
 
@@ -224,7 +223,7 @@ const NodeCanvas: React.FC<NodeCanvasProps> = ({ pendingNode, onNodeAdded }) => 
           key={node.id}
           node={node}
           onDragStart={handleNodeDragStart}
-          onConnectionStart={handleConnectionStart}
+          onConnectionStart={(nodeId) => handleConnectionStart(nodeId)}
           onConnectionEnd={handleConnectionEnd}
           onDelete={handleDeleteNode}
         />
