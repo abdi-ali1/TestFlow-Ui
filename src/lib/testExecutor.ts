@@ -23,6 +23,6 @@ export interface ExecutionResponse {
 }
 
 export const executeTest = async (payload: ExecutionRequest): Promise<ExecutionResponse> => {
-  const res = await axios.post('http://localhost:8000/v1/execute/run', payload);
+  const res = await axios.post('http://localhost:9001/run', payload);
   return res.data;
 };
